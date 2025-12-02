@@ -1,68 +1,103 @@
-import numpy as np
-from .graph import Cell
-from .utils import trace_path
+from typing import Dict, List, Tuple
+from collections import deque
+import heapq
+from .graph import GridGraph, Cell
 
-"""
-General graph search instructions:
+def _reconstruct(came_from: Dict[Cell, Cell], start: Cell, goal: Cell) -> List[Cell]:
+    if goal not in came_from and goal != start:
+        return []
+    cur = goal
+    path = [cur]
+    while cur != start:
+        cur = came_from[cur]
+        path.append(cur)
+    path.reverse()
+    return path
 
-First, define the correct data type to keep track of your visited cells
-and add the start cell to it. If you need to initialize any properties
-of the start cell, do that too.
+# -------- BFS --------
+def bfs_with_visited(g: GridGraph, start: Cell, goal: Cell) -> Tuple[List[Cell], List[Cell]]:
+    if not g.cell_is_free(start) or not g.cell_is_free(goal):
+        return [], []
+    q = deque([start])
+    came_from: Dict[Cell, Cell] = {}
+    visited_set = {start}
+    visited_order: List[Cell] = [start]
+    while q:
+        v = q.popleft()
+        if v == goal:
+            break
+        for n in g.neighbors(v):
+            if n not in visited_set:
+                visited_set.add(n)
+                visited_order.append(n)
+                came_from[n] = v
+                q.append(n)
+    return _reconstruct(came_from, start, goal), visited_order
 
-Next, implement the graph search function. When you find a path, use the
-trace_path() function to return a path given the goal cell and the graph. You
-must have kept track of the parent of each node correctly and have implemented
-the graph.get_parent() function for this to work. If you do not find a path,
-return an empty list.
+# -------- DFS --------
+def dfs_with_visited(g: GridGraph, start: Cell, goal: Cell) -> Tuple[List[Cell], List[Cell]]:
+    if not g.cell_is_free(start) or not g.cell_is_free(goal):
+        return [], []
+    stack = [start]
+    came_from: Dict[Cell, Cell] = {}
+    visited_set = {start}
+    visited_order: List[Cell] = [start]
+    while stack:
+        v = stack.pop()
+        if v == goal:
+            break
+        for n in g.neighbors(v):
+            if n not in visited_set:
+                visited_set.add(n)
+                visited_order.append(n)
+                came_from[n] = v
+                stack.append(n)
+    return _reconstruct(came_from, start, goal), visited_order
 
-To visualize which cells are visited in the navigation webapp, save each
-visited cell in the list in the graph class as follows:
-     graph.visited_cells.append(Cell(cell_i, cell_j))
-where cell_i and cell_j are the cell indices of the visited cell you want to
-visualize.
-"""
+def _manhattan(a: Cell, b: Cell) -> int:
+    return abs(a.i - b.i) + abs(a.j - b.j)
 
+# -------- A* --------
+def astar_with_visited(g: GridGraph, start: Cell, goal: Cell) -> Tuple[List[Cell], List[Cell]]:
+    if not g.cell_is_free(start) or not g.cell_is_free(goal):
+        return [], []
+    pq: List[Tuple[int,int,int,Cell]] = []  # (f, h, tie, node)
+    came_from: Dict[Cell, Cell] = {}
+    g_cost: Dict[Cell, int] = {start: 0}
+    tie = 0
+    h0 = _manhattan(start, goal)
+    heapq.heappush(pq, (h0, h0, tie, start))
+    closed = set()
+    visited_order: List[Cell] = []
 
-def depth_first_search(graph, start, goal):
-    """Depth First Search (DFS) algorithm. This algorithm is optional for P3.
-    Args:
-        graph: The graph class.
-        start: Start cell as a Cell object.
-        goal: Goal cell as a Cell object.
-    """
-    graph.init_graph()  # Make sure all the node values are reset.
+    while pq:
+        _, _, _, v = heapq.heappop(pq)
+        if v in closed:
+            continue
+        closed.add(v)
+        visited_order.append(v)
+        if v == goal:
+            break
+        for n in g.neighbors(v):
+            new_g = g_cost[v] + 1
+            if n not in g_cost or new_g < g_cost[n]:
+                g_cost[n] = new_g
+                tie += 1
+                h = _manhattan(n, goal)
+                heapq.heappush(pq, (new_g + h, h, tie, n))
+                came_from[n] = v
 
-    """TODO (P3): Implement DFS (optional)."""
+    return _reconstruct(came_from, start, goal), visited_order
 
-    # If no path was found, return an empty list.
-    return []
+# Backwards-compatible simple APIs
+def breadth_first_search(g: GridGraph, start: Cell, goal: Cell) -> List[Cell]:
+    path, _ = bfs_with_visited(g, start, goal)
+    return path
 
+def depth_first_search(g: GridGraph, start: Cell, goal: Cell) -> List[Cell]:
+    path, _ = dfs_with_visited(g, start, goal)
+    return path
 
-def breadth_first_search(graph, start, goal):
-    """Breadth First Search (BFS) algorithm.
-    Args:
-        graph: The graph class.
-        start: Start cell as a Cell object.
-        goal: Goal cell as a Cell object.
-    """
-    graph.init_graph()  # Make sure all the node values are reset.
-
-    """TODO (P3): Implement BFS."""
-
-    # If no path was found, return an empty list.
-    return []
-
-
-def a_star_search(graph, start, goal):
-    """A* Search (BFS) algorithm.
-    Args:
-        graph: The graph class.
-        start: Start cell as a Cell object.
-        goal: Goal cell as a Cell object.
-    """
-    graph.init_graph()  # Make sure all the node values are reset.
-
-    """TODO (P3): Implement A*."""
-
-    # If no path was found, return an empty list.
-    return []
+def a_star_search(g: GridGraph, start: Cell, goal: Cell) -> List[Cell]:
+    path, _ = astar_with_visited(g, start, goal)
+    return path

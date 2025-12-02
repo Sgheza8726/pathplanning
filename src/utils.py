@@ -1,37 +1,21 @@
 import json
-from .graph import Cell
+from typing import List, Optional
+from .graph import GridGraph, Cell
 
+def _to_pair(c: Cell) -> list:
+    return [int(c.i), int(c.j)]
 
-def trace_path(cell, graph):
-    """Traces a path from the given cell through its parents."""
-    path = []
-    while cell is not None:
-        path.append(Cell(cell.i, cell.j))
-        cell = graph.get_parent(cell)
-    # Reverse the path since it is from goal to start at this point.
-    path.reverse()
-    return path
-
-
-def generate_plan_file(graph, start, goal, path, algo="", out_name="out.planner"):
-    """Generates the planner file for visualization in the navigation web app.
-
-    The app can be found at: hellorob.org/nav-app
-    """
-    print(f"Saving planning data to file: {out_name}")
-
-    path_data = [[cell.i, cell.j] for cell in path]
-    visited_cells_data = [[cell.i, cell.j] for cell in graph.visited_cells]
-
-    plan = {
-        "path": path_data,
-        "visited_cells": visited_cells_data,
-        "dt": [],
-        "map": graph.as_string(),  # assuming mapAsString(graph) is equivalent to self.map_as_string()
-        "start": [start.i, start.j],
-        "goal": [goal.i, goal.j],
-        "planning_algo": algo
+def generate_plan_file(graph: GridGraph,
+                       start: Cell,
+                       goal: Cell,
+                       path: List[Cell],
+                       visited: Optional[List[Cell]] = None,
+                       out_path: str = "out.planner") -> None:
+    payload = {
+        "start": _to_pair(start),
+        "goal": _to_pair(goal),
+        "path": [_to_pair(c) for c in (path or [])],
+        "visited": [_to_pair(c) for c in (visited or [])]
     }
-
-    with open(out_name, 'w') as outfile:
-        json.dump(plan, outfile)
+    with open(out_path, "w") as f:
+        json.dump(payload, f)
